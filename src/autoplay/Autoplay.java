@@ -25,7 +25,7 @@ public class Autoplay {
         try {
             n_games = Integer.parseInt(args[0]);
             //TODO
-            n_games = 400;
+            n_games = 50;
             if (n_games < 1) {
                 throw new Exception();
             }

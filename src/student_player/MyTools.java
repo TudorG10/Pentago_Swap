@@ -1,6 +1,7 @@
 package student_player;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Random;
 
 import pentago_swap.PentagoBoardState;
@@ -14,11 +15,24 @@ public class MyTools {
 	/*
 	 * 
 	 */
+    private static final int QUAD_SIZE = 3;
+    private static final int NUM_QUADS = 4;
+    private static Piece[][] myBoard;
+	private static Piece[][][] myQuadrants;
+    private static final int BOARD_SIZE = 6;
+    private static HashMap<Quadrant, Integer> quadToInt;
+    static {
+        quadToInt = new HashMap<>(4);
+        quadToInt.put(Quadrant.TL, 0);
+        quadToInt.put(Quadrant.TR, 1);
+        quadToInt.put(Quadrant.BL, 2);
+        quadToInt.put(Quadrant.BR, 3);
+    }
 
 
 
     public static PentagoMove goFirst(PentagoBoardState boardState, int id) {
-    	double[][] moveWorth = new double[6][6];//weight array
+    	double[][] moveWorth = new double[BOARD_SIZE][BOARD_SIZE];//weight array
     	Piece myPiece;
     	if(id == 0) {
     		myPiece = Piece.WHITE;
@@ -26,7 +40,9 @@ public class MyTools {
     	else {
     		myPiece = Piece.BLACK;
     	}
-
+//    	System.out.println("white compared to black: " + Piece.WHITE.compareTo(Piece.BLACK));
+//    	System.out.println("black compared to white: " + Piece.BLACK.compareTo(Piece.WHITE));
+    	
     	ArrayList<PentagoMove> moves = boardState.getAllLegalMoves();
         if(boardState.getTurnNumber() == 0) {
         	return hardMoves(boardState, id);
@@ -38,8 +54,8 @@ public class MyTools {
         else {        	
         	
             makeWorthArray(boardState, moveWorth, myPiece);//array of weights
-            
-    		printWorthArray(moveWorth);
+//            makeBoardFromWorthArray(moveWorth, boardState);//my very own board State Piece[][]
+//    		printWorthArray(moveWorth);
     		
             ArrayList<PentagoMove> chosenMoves = winOrBlockWin(boardState,id);//available move
             PentagoMove chosenMove = null;
@@ -83,47 +99,51 @@ public class MyTools {
 		}
 		return null;
 	}
-    
-    private static double checkIfAnother(PentagoBoardState currentState,PentagoCoord curLoc, PentagoCoord dirCoor, Piece myPiece) {
-    	//TODO doesn't keep chaining
-    	int dirX = dirCoor.getX() - curLoc.getX();
-    	int dirY = dirCoor.getY() - curLoc.getY();
+
+    private static double checkIfAnother(PentagoBoardState currentState, PentagoCoord nextLoc, int deltaX, int deltaY, Piece myPiece) {
+   
     	boolean nextOK = true;
     	PentagoCoord newCoord = null;
+		Piece newPiece = currentState.getPieceAt(nextLoc);
+		
     	try {
-		 	newCoord = new PentagoCoord(dirCoor.getX() + dirX, dirCoor.getY() + dirY);
+		 	newCoord = new PentagoCoord(nextLoc.getX() + deltaX, nextLoc.getY() + deltaY);
     	}
 		catch(IllegalArgumentException e){
 			nextOK = false;
 		}
-		if(nextOK){
-			Piece newPiece = currentState.getPieceAt(dirCoor);
-			if(newPiece.compareTo(Piece.EMPTY) == 0) {
-				return 0;
-			}
-			if(newPiece.compareTo(myPiece) == 0) {
-				System.out.println("\nDOES IT CHAIN TO ANOTHER SAME COLOUR\n");
-				return 1 + checkIfAnother(currentState, dirCoor, newCoord, myPiece);
 
+		if(newPiece.compareTo(Piece.EMPTY) == 0) {
+			return 0;
+		}
+		else if(newPiece.compareTo(myPiece) == 0) {
+			if(nextOK){
+				return 1 + 1.5 * checkIfAnother(currentState, newCoord, deltaX, deltaY, myPiece);
 			}
-			if(newPiece.compareTo(myPiece) != 0) {
-				System.out.println("\nDOES IT CHAIN TO ANOTHER DIFF COLOUR\n");
-				return 0.5 + checkIfAnother(currentState, dirCoor, newCoord, myPiece);
-
+			else {
+				return 1;
 			}
 		}
-    	return 0;
+		else {
+			if(nextOK){
+				return 0.5 + 1.2 * checkIfAnother(currentState, newCoord, deltaX, deltaY, myPiece);
+			}
+			else {
+				return 0.5;
+			}
+
+		}
+
     }
     
 	private static void makeWorthArray(PentagoBoardState currentState,double[][] moveWorth, Piece myPiece) {
 		
-		for(int x = 0; x < 6; x++) {
-			for(int y = 0; y < 6; y++) {
+		for(int x = 0; x < BOARD_SIZE; x++) {
+			for(int y = 0; y < BOARD_SIZE; y++) {
 		    	PentagoCoord curCoord = new PentagoCoord(x,y);
 
 				Piece aPiece = currentState.getPieceAt(curCoord);
 				if(aPiece == Piece.EMPTY) {//empty tile, means we might place it there
-					//need function to get value of this empty tile
 					boolean ok0 = true;
 					boolean ok1 = true;
 					boolean ok2 = true;
@@ -191,35 +211,35 @@ public class MyTools {
 					}
 
 					if(ok0) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord0, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord0, -1, -1, myPiece);
 
 					}
 					if(ok1) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord1, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord1, 0, -1, myPiece);
 
 					}
 					if(ok2) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord2, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord2, 1, -1, myPiece);
 
 					}
 					if(ok3) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord3, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord3, 1, 0, myPiece);
 
 					}
 					if(ok4) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord4, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord4, 1, 1, myPiece);
 
 					}
 					if(ok5) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord5, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord5, 0, 1, myPiece);
 
 					}
 					if(ok6) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord6, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord6, -1, 1, myPiece);
 
 					}
 					if(ok7) {
-						moveWorth[y][x] += checkIfAnother(currentState, curCoord, newCoord7, myPiece);
+						moveWorth[y][x] += checkIfAnother(currentState, newCoord7, -1, 0, myPiece);
 
 					}
 				}
@@ -227,8 +247,8 @@ public class MyTools {
 		}
 	}
 	private static void printWorthArray(double[][] moveWorth) {
-		for(int y = 0; y < 6; y++) {
-    		for(int x = 0; x < 6; x++) {
+		for(int y = 0; y < BOARD_SIZE; y++) {
+    		for(int x = 0; x < BOARD_SIZE; x++) {
     			System.out.print("["+moveWorth[x][y]+"]\t");
     		}
 			System.out.println("");
@@ -294,4 +314,51 @@ public class MyTools {
         }
 
     }
+	private static void makeBoardFromWorthArray(double[][] worthArray, PentagoBoardState boardState){
+		for(int x = 0; x < BOARD_SIZE; x++) {
+			for(int y = 0; y < BOARD_SIZE; y++) {
+				if(worthArray[y][x] == 0) {
+					myBoard[y][x] = boardState.getPieceAt(y, x);
+				}
+			}
+		}
+	}
+    private static void updateBoard(PentagoBoardState pbs) {
+    	//fuck these private methods
+        myBoard = new Piece[BOARD_SIZE][BOARD_SIZE];
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            System.arraycopy(pbs.board[i], 0, myBoard[i], 0, BOARD_SIZE);
+        }
+        myQuadrants = new Piece[NUM_QUADS][QUAD_SIZE][QUAD_SIZE];
+        for (int i = 0; i < NUM_QUADS; i++) {
+            for (int j = 0; j < QUAD_SIZE; j++) {
+                System.arraycopy(pbs.quadrants[i][j], 0, myQuadrants[i][j], 0, QUAD_SIZE);
+            }
+        }
+    }
+
+	private static void swap(Quadrant Q1, Quadrant Q2) {
+	    //Swapping mechanism
+	    int a = quadToInt.get(Q1);
+	    int b = quadToInt.get(Q2);
+	    Piece[][] tmp = myQuadrants[a];
+	    myQuadrants[a] = myQuadrants[b];
+	    myQuadrants[b] = tmp;
+	
+	    buildBoardFromQuadrants();
+	}
+
+	/**
+	 * Updates the board after the quadrants have changed.
+	 */
+	private static void buildBoardFromQuadrants() {
+	    for (int i = 0; i < BOARD_SIZE; i++) {
+	        int quadrantRow = i < 3 ? i : i - 3;
+	        int leftQuad = i < 3 ? 0 : 2;
+	        int rightQuad = i < 3 ? 1 : 3;
+	        System.arraycopy(myQuadrants[leftQuad][quadrantRow], 0, myBoard[i], 0, 3);
+	        System.arraycopy(myQuadrants[rightQuad][quadrantRow], 0, myBoard[i], 3, 3);
+	    }
+	}
+
 }
