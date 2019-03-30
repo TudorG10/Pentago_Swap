@@ -19,6 +19,7 @@ public class MyTools {
     private static final double WEIGHT_SAME = 1.2;
     private static final double WEIGHT_DIFF = 1.5;
     private static final double MEDIAN_DIVISOR = 2;
+    private static final double NOT_TRIMMED_WEIGHT = 1.1;
     
 
 
@@ -72,7 +73,7 @@ public class MyTools {
 			}
 		}
 		
-		printMoves(movesLeft);
+//		printMoves(movesLeft);
 		return movesLeft;
 	}
     private static double getMaxMoveVal(double[][] arr) {
@@ -279,17 +280,18 @@ public class MyTools {
     	}
     	//gets trimmed list of moves
 //    	System.out.println("numMoves before prune: " + boardState.getAllLegalMoves().size());
-    	ArrayList<PentagoMove> movesLeft = getTrimmedMoveList(boardState, myPiece, boardState.getAllLegalMoves());
+    	ArrayList<PentagoMove> allMoves = boardState.getAllLegalMoves();
+    	ArrayList<PentagoMove> movesLeft = getTrimmedMoveList(boardState, myPiece, allMoves);
 //    	System.out.println("numMoves after prune: " + movesLeft.size());
 
 //    	ArrayList<PentagoMove> movesLeft = boardState.getAllLegalMoves();
 
-    	double[] bestBranch = new double[movesLeft.size()];
+    	double[] bestBranch = new double[allMoves.size()];
     	for(int j = 0; j < bestBranch.length; j++) {
     		bestBranch[j] = 0;
     	}
     	int i = 0;
-        for(PentagoMove m : movesLeft) {
+        for(PentagoMove m : allMoves) {
         	PentagoBoardState myNewBoard = (PentagoBoardState) boardState.clone();
             myNewBoard.processMove((PentagoMove) m);           
             if(myNewBoard.getWinner() == myID) {//case i can win next move
@@ -301,15 +303,22 @@ public class MyTools {
             	bestBranch[i] += rollOutProtocol(myNewBoard, myID, opID);
 
             }
-        	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+            if(movesLeft.contains(m)) {
+            	bestBranch[i] = Math.floor((NOT_TRIMMED_WEIGHT * (bestBranch[i]/NUM_ROLLS)) * 100) / 100;
+            }
+            else {
+            	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+            }
+//        	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+
         	i++;
         }
         
 
         int index = getIndexOfMax(bestBranch);
 //        printValArray(bestBranch);
-//        System.out.println("Index: "+ index + " Chosen move: " + (movesLeft.get(index)).toPrettyString() );
-		return movesLeft.get(index);
+//        System.out.println("Index: "+ index + " Chosen move: " + (allMoves.get(index)).toPrettyString() );
+		return allMoves.get(index);
     }
     private static PentagoMove MonteCarlo(PentagoBoardState boardState, int id, Piece myPiece) {
     	int myID = id;
