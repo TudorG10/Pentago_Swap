@@ -18,7 +18,7 @@ public class MyTools {
     private static int NUM_ROLLS = 100;
     private static final double WEIGHT_SAME = 1.2;
     private static final double WEIGHT_DIFF = 1.5;
-    private static final double MEDIAN_DIVISOR = 1.5;
+    private static final double MEDIAN_DIVISOR = 2;
     
 
 
@@ -30,43 +30,49 @@ public class MyTools {
     	else {
     		myPiece = Piece.BLACK;
     	}
-//    	System.out.println("white compared to black: " + Piece.WHITE.compareTo(Piece.BLACK));
-//    	System.out.println("black compared to white: " + Piece.BLACK.compareTo(Piece.WHITE));
     	
-    	ArrayList<PentagoMove> moves = boardState.getAllLegalMoves();
         if(boardState.getTurnNumber() == 0) {
         	return hardMoves(boardState, id);
         }
-//        else if(boardState.getTurnNumber() == 1) {
-//        	return hardMoves(boardState, id);
-//        }
-        if(boardState.getTurnNumber() < 5) {
+        else if(boardState.getTurnNumber() == 1) {
+        	return hardMoves(boardState, id);
+        }
+        else{
             return MonteCarloLite(boardState, id, myPiece);
         }
-        else {        
-        	NUM_ROLLS = 10;
-            return MonteCarlo(boardState, id, myPiece);
-        }
+//        else if(boardState.getTurnNumber() < 8) {
+//            return MonteCarloLite(boardState, id, myPiece);
+//        }
+//        else {        
+//        	NUM_ROLLS = 10;
+//            return MonteCarlo(boardState, id, myPiece);
+//        }
  
     }
 	private static ArrayList<PentagoMove> getTrimmedMoveList(PentagoBoardState boardState, Piece myPiece,
 			ArrayList<PentagoMove> moves) {
-		ArrayList<PentagoMove> movesLeft = moves;
+		ArrayList<PentagoMove> movesLeft = new ArrayList<>();
 		double[][] moveWorth = makeWorthArray(boardState, myPiece);//array of weights
 		double medianMoveValue = getMaxMoveVal(moveWorth)/MEDIAN_DIVISOR;
 //		printWorthArray(moveWorth);
-//    		System.out.println("medianVal: " + medianMoveValue);
+//		System.out.println("medianVal: " + medianMoveValue);
 //    		System.out.println("numMoves before trim: " + movesLeft.size());
 
-		//trim bad moves
+		//add good moves
 		for(int i = 0; i < moves.size(); i++) {
 			PentagoMove m = moves.get(i);
 			int x = m.getMoveCoord().getX();
 			int y = m.getMoveCoord().getY();
-			if(moveWorth[y][x] < medianMoveValue) {
-				movesLeft.remove(i);
+//			System.out.println("Evaluating move: " + moves.get(i).toPrettyString());
+
+			if(moveWorth[y][x] > medianMoveValue) {
+				movesLeft.add(moves.get(i));
+//				System.out.println("added move: " + movesLeft.get(i).toPrettyString());
+
 			}
 		}
+		
+		printMoves(movesLeft);
 		return movesLeft;
 	}
     private static double getMaxMoveVal(double[][] arr) {
@@ -112,7 +118,13 @@ public class MyTools {
 		}
 
 		if(newPiece.compareTo(Piece.EMPTY) == 0) {
-			return 0;
+			if(nextOK) {
+				return 0 + getTileWorth(currentState, newCoord, deltaX, deltaY, myPiece) ;
+
+			}
+			else {
+				return 0;
+			}
 		}
 		else if(newPiece.compareTo(myPiece) == 0) {
 			if(nextOK){
@@ -249,6 +261,11 @@ public class MyTools {
 				}
 			}
 		}
+		for(int x = 0; x < BOARD_SIZE; x++) {
+			for(int y = 0; y < BOARD_SIZE; y++) {
+				moveWorth[x][y] = Math.floor((moveWorth[x][y]) * 100) / 100;;
+			}
+		}
 		return moveWorth;
 	}
     private static PentagoMove MonteCarloLite(PentagoBoardState boardState, int id, Piece myPiece) {
@@ -261,7 +278,11 @@ public class MyTools {
     		opID = 0;
     	}
     	//gets trimmed list of moves
+//    	System.out.println("numMoves before prune: " + boardState.getAllLegalMoves().size());
     	ArrayList<PentagoMove> movesLeft = getTrimmedMoveList(boardState, myPiece, boardState.getAllLegalMoves());
+//    	System.out.println("numMoves after prune: " + movesLeft.size());
+
+//    	ArrayList<PentagoMove> movesLeft = boardState.getAllLegalMoves();
 
     	double[] bestBranch = new double[movesLeft.size()];
     	for(int j = 0; j < bestBranch.length; j++) {
@@ -273,6 +294,7 @@ public class MyTools {
             myNewBoard.processMove((PentagoMove) m);           
             if(myNewBoard.getWinner() == myID) {//case i can win next move
             	bestBranch[i] +=1000;
+            	continue;
             }
             
             for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
@@ -311,6 +333,7 @@ public class MyTools {
             myNewBoard.processMove((PentagoMove) m);           
             if(myNewBoard.getWinner() == myID) {//case i can win next move
             	bestBranch[i] +=1000;
+            	continue;
             }
             
         	ArrayList<PentagoMove> movesLeft2 = getTrimmedMoveList(myNewBoard, myPiece, myNewBoard.getAllLegalMoves());
@@ -329,6 +352,7 @@ public class MyTools {
                 myNewBoard2.processMove((PentagoMove) m2);           
                 if(myNewBoard2.getWinner() == opID) {//case i can win next move
                 	bestBranch2[k] -=1000;
+                	continue;
                 }
         	
 	            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
@@ -351,8 +375,8 @@ public class MyTools {
         }
 
         int index = getIndexOfMax(bestBranch);
-        printValArray(bestBranch);
-        System.out.println("Index: "+ index + " Chosen move: " + (movesLeft.get(index)).toPrettyString() );
+//        printValArray(bestBranch);
+//        System.out.println("Index: "+ index + " Chosen move: " + (movesLeft.get(index)).toPrettyString() );
 		return movesLeft.get(index);
     }
     private static int getIndexOfMax(double[] bestBranch) {
