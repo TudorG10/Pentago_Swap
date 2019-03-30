@@ -42,7 +42,7 @@ public class StudentPlayer extends PentagoPlayer {
         }
         else {
         	//defense opener
-        	PentagoMove TGMove = MyTools.goFirst(boardState,player_id);
+        	PentagoMove TGMove = MyTools.goSecond(boardState,player_id);
         	return TGMove;
         }
        

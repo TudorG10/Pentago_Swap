@@ -15,7 +15,7 @@ import pentago_swap.PentagoCoord;
 public class MyTools {
 
     private static final int BOARD_SIZE = 6;
-    private static int NUM_ROLLS = 100;
+    private static int NUM_ROLLS = 70;
     private static final double WEIGHT_SAME = 1.2;
     private static final double WEIGHT_DIFF = 1.5;
     private static final double MEDIAN_DIVISOR = 2;
@@ -50,6 +50,31 @@ public class MyTools {
 //        }
  
     }
+    public static PentagoMove goSecond(PentagoBoardState boardState, int id) {
+    	Piece myPiece;
+    	if(id == 0) {
+    		myPiece = Piece.WHITE;
+    	}
+    	else {
+    		myPiece = Piece.BLACK;
+    	}
+    	
+        if(boardState.getTurnNumber() == 0) {
+        	return hardMoves(boardState, id);
+        }
+        else{
+            return MonteCarloLite(boardState, id, myPiece);
+        }
+//        else if(boardState.getTurnNumber() < 8) {
+//            return MonteCarloLite(boardState, id, myPiece);
+//        }
+//        else {        
+//        	NUM_ROLLS = 10;
+//            return MonteCarlo(boardState, id, myPiece);
+//        }
+
+    }
+
 	private static ArrayList<PentagoMove> getTrimmedMoveList(PentagoBoardState boardState, Piece myPiece,
 			ArrayList<PentagoMove> moves) {
 		ArrayList<PentagoMove> movesLeft = new ArrayList<>();
@@ -298,19 +323,21 @@ public class MyTools {
             	bestBranch[i] +=1000;
             	continue;
             }
-            
-            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
-            	bestBranch[i] += rollOutProtocol(myNewBoard, myID, opID);
-
-            }
             if(movesLeft.contains(m)) {
+                for(int numRolls = 0; numRolls < 2 * NUM_ROLLS; numRolls++) {//do rollouts
+                	bestBranch[i] += rollOutProtocol(myNewBoard, myID, opID);
+                }
             	bestBranch[i] = Math.floor((NOT_TRIMMED_WEIGHT * (bestBranch[i]/NUM_ROLLS)) * 100) / 100;
+
             }
             else {
-            	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
-            }
-//        	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+                for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
+                	bestBranch[i] += rollOutProtocol(myNewBoard, myID, opID);
 
+                }
+            	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+
+            }
         	i++;
         }
         
