@@ -13,29 +13,16 @@ import pentago_swap.PentagoBoardState.Quadrant;
 import pentago_swap.PentagoCoord;
 
 public class MyTools {
-	//TODO in general
-	/*
-	 * 
-	 */
-    private static final int QUAD_SIZE = 3;
-    private static final int NUM_QUADS = 4;
-    private static Piece[][] myBoard;
-	private static Piece[][][] myQuadrants;
-    private static final int BOARD_SIZE = 6;
-    private static final int NUM_ROLLS = 50;
-    private static HashMap<Quadrant, Integer> quadToInt;
-    static {
-        quadToInt = new HashMap<>(4);
-        quadToInt.put(Quadrant.TL, 0);
-        quadToInt.put(Quadrant.TR, 1);
-        quadToInt.put(Quadrant.BL, 2);
-        quadToInt.put(Quadrant.BR, 3);
-    }
 
+    private static final int BOARD_SIZE = 6;
+    private static int NUM_ROLLS = 100;
+    private static final double WEIGHT_SAME = 1.2;
+    private static final double WEIGHT_DIFF = 1.5;
+    private static final double MEDIAN_DIVISOR = 1.5;
+    
 
 
     public static PentagoMove goFirst(PentagoBoardState boardState, int id) {
-    	double[][] moveWorth = new double[BOARD_SIZE][BOARD_SIZE];//weight array
     	Piece myPiece;
     	if(id == 0) {
     		myPiece = Piece.WHITE;
@@ -50,41 +37,48 @@ public class MyTools {
         if(boardState.getTurnNumber() == 0) {
         	return hardMoves(boardState, id);
         }
-        else if(boardState.getTurnNumber() == 1) {
-        	return hardMoves(boardState, id);
+//        else if(boardState.getTurnNumber() == 1) {
+//        	return hardMoves(boardState, id);
+//        }
+        if(boardState.getTurnNumber() < 5) {
+            return MonteCarloLite(boardState, id, myPiece);
         }
-
-        else {        	
-        	
-            makeWorthArray(boardState, moveWorth, myPiece);//array of weights
-//            makeBoardFromWorthArray(moveWorth, boardState);//my very own board State Piece[][]
-//    		printWorthArray(moveWorth);
-    		/*
-            ArrayList<PentagoMove> chosenMoves = winOrBlockWin(boardState,id);//available move
-            PentagoMove chosenMove = null;
-            double bestPlay = 0;
-            
-            for(PentagoMove move : chosenMoves) {
-//            	System.out.print("moveList: " + move.toPrettyString());
-            	double moveVal = Math.max(bestPlay, moveWorth[move.getMoveCoord().getY()][move.getMoveCoord().getX()]);
-            	if(moveVal > bestPlay) {
-            		bestPlay = moveVal;
-            		chosenMove = move;
-            	}
-            }
-            */
-//        	Random rand = new Random();
-//            int n = rand.nextInt(moves.size());//get random move from remaining moves
-//        	System.out.println("\nCHOSEN MOVE: " + chosenMove.toPrettyString());
-//        	System.out.println("BEST VAL: " + bestPlay);
-
-
-//            return chosenMove;
-            return MonteCarloLite(boardState, id);
+        else {        
+        	NUM_ROLLS = 10;
+            return MonteCarlo(boardState, id, myPiece);
         }
  
     }
+	private static ArrayList<PentagoMove> getTrimmedMoveList(PentagoBoardState boardState, Piece myPiece,
+			ArrayList<PentagoMove> moves) {
+		ArrayList<PentagoMove> movesLeft = moves;
+		double[][] moveWorth = makeWorthArray(boardState, myPiece);//array of weights
+		double medianMoveValue = getMaxMoveVal(moveWorth)/MEDIAN_DIVISOR;
+//		printWorthArray(moveWorth);
+//    		System.out.println("medianVal: " + medianMoveValue);
+//    		System.out.println("numMoves before trim: " + movesLeft.size());
 
+		//trim bad moves
+		for(int i = 0; i < moves.size(); i++) {
+			PentagoMove m = moves.get(i);
+			int x = m.getMoveCoord().getX();
+			int y = m.getMoveCoord().getY();
+			if(moveWorth[y][x] < medianMoveValue) {
+				movesLeft.remove(i);
+			}
+		}
+		return movesLeft;
+	}
+    private static double getMaxMoveVal(double[][] arr) {
+    	double max = 0;
+    	for(int x = 0; x < arr.length; x++) {
+    		for(int y = 0; y < arr[x].length; y++) {
+    			if(arr[y][x] > max)
+    				max = arr[y][x];
+    		}
+    	}
+    	return max;
+    }
 	private static PentagoMove hardMoves(PentagoBoardState boardState, int id) {
 		PentagoMove move11 = new PentagoMove(1, 1, Quadrant.BL, Quadrant.BR, id);
 		PentagoMove move14 = new PentagoMove(1, 4, Quadrant.BL, Quadrant.BR, id);
@@ -104,7 +98,7 @@ public class MyTools {
 		return null;
 	}
 
-    private static double checkIfAnother(PentagoBoardState currentState, PentagoCoord nextLoc, int deltaX, int deltaY, Piece myPiece) {
+    private static double getTileWorth(PentagoBoardState currentState, PentagoCoord nextLoc, int deltaX, int deltaY, Piece myPiece) {
    
     	boolean nextOK = true;
     	PentagoCoord newCoord = null;
@@ -122,7 +116,7 @@ public class MyTools {
 		}
 		else if(newPiece.compareTo(myPiece) == 0) {
 			if(nextOK){
-				return 1 + 1.5 * checkIfAnother(currentState, newCoord, deltaX, deltaY, myPiece);
+				return 1 + WEIGHT_SAME * getTileWorth(currentState, newCoord, deltaX, deltaY, myPiece);
 			}
 			else {
 				return 1;
@@ -130,7 +124,7 @@ public class MyTools {
 		}
 		else {
 			if(nextOK){
-				return 0.5 + 1.2 * checkIfAnother(currentState, newCoord, deltaX, deltaY, myPiece);
+				return 0.5 + WEIGHT_DIFF * getTileWorth(currentState, newCoord, deltaX, deltaY, myPiece);
 			}
 			else {
 				return 0.5;
@@ -140,8 +134,14 @@ public class MyTools {
 
     }
     
-	private static void makeWorthArray(PentagoBoardState currentState,double[][] moveWorth, Piece myPiece) {
-		
+	private static double[][] makeWorthArray(PentagoBoardState currentState, Piece myPiece) {
+		double[][] moveWorth = new double[BOARD_SIZE][BOARD_SIZE];
+		for(int x = 0; x < BOARD_SIZE; x++) {
+			for(int y = 0; y < BOARD_SIZE; y++) {
+				moveWorth[x][y] = 0;
+			}
+		}
+
 		for(int x = 0; x < BOARD_SIZE; x++) {
 			for(int y = 0; y < BOARD_SIZE; y++) {
 		    	PentagoCoord curCoord = new PentagoCoord(x,y);
@@ -215,50 +215,43 @@ public class MyTools {
 					}
 
 					if(ok0) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord0, -1, -1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord0, -1, -1, myPiece);
 
 					}
 					if(ok1) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord1, 0, -1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord1, 0, -1, myPiece);
 
 					}
 					if(ok2) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord2, 1, -1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord2, 1, -1, myPiece);
 
 					}
 					if(ok3) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord3, 1, 0, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord3, 1, 0, myPiece);
 
 					}
 					if(ok4) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord4, 1, 1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord4, 1, 1, myPiece);
 
 					}
 					if(ok5) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord5, 0, 1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord5, 0, 1, myPiece);
 
 					}
 					if(ok6) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord6, -1, 1, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord6, -1, 1, myPiece);
 
 					}
 					if(ok7) {
-						moveWorth[y][x] += checkIfAnother(currentState, newCoord7, -1, 0, myPiece);
+						moveWorth[y][x] += getTileWorth(currentState, newCoord7, -1, 0, myPiece);
 
 					}
 				}
 			}
 		}
+		return moveWorth;
 	}
-	private static void printWorthArray(double[][] moveWorth) {
-		for(int y = 0; y < BOARD_SIZE; y++) {
-    		for(int x = 0; x < BOARD_SIZE; x++) {
-    			System.out.print("["+moveWorth[x][y]+"]\t");
-    		}
-			System.out.println("");
-    	}
-	}   
-    private static PentagoMove MonteCarloLite(PentagoBoardState boardState, int id) {
+    private static PentagoMove MonteCarloLite(PentagoBoardState boardState, int id, Piece myPiece) {
     	int myID = id;
     	int opID;
     	if(myID == 0) {
@@ -267,38 +260,36 @@ public class MyTools {
     	else {
     		opID = 0;
     	}
-    	
-    	ArrayList<PentagoMove> myMove = boardState.getAllLegalMoves();
-    	Integer[] bestBranch = new Integer[myMove.size()];
+    	//gets trimmed list of moves
+    	ArrayList<PentagoMove> movesLeft = getTrimmedMoveList(boardState, myPiece, boardState.getAllLegalMoves());
+
+    	double[] bestBranch = new double[movesLeft.size()];
     	for(int j = 0; j < bestBranch.length; j++) {
     		bestBranch[j] = 0;
     	}
     	int i = 0;
-        for(PentagoMove m : myMove) {
+        for(PentagoMove m : movesLeft) {
         	PentagoBoardState myNewBoard = (PentagoBoardState) boardState.clone();
-            myNewBoard.processMove((PentagoMove) m);
+            myNewBoard.processMove((PentagoMove) m);           
             if(myNewBoard.getWinner() == myID) {//case i can win next move
             	bestBranch[i] +=1000;
             }
             
-            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do 10 rollouts
+            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
             	bestBranch[i] += rollOutProtocol(myNewBoard, myID, opID);
 
             }
-
-            
-          
-            i++;
+        	bestBranch[i] = bestBranch[i]/NUM_ROLLS;
+        	i++;
         }
+        
 
         int index = getIndexOfMax(bestBranch);
 //        printValArray(bestBranch);
-//        System.out.println("Index: "+ index + " Chosen move: " + (myMove.get(index)).toPrettyString() );
-		return myMove.get(index);
+//        System.out.println("Index: "+ index + " Chosen move: " + (movesLeft.get(index)).toPrettyString() );
+		return movesLeft.get(index);
     }
-
-    private static PentagoMove MonteCarlo(PentagoBoardState boardState, int id) {
-    	//TODO pass the list of moves to work with to reduce computation time
+    private static PentagoMove MonteCarlo(PentagoBoardState boardState, int id, Piece myPiece) {
     	int myID = id;
     	int opID;
     	if(myID == 0) {
@@ -307,68 +298,69 @@ public class MyTools {
     	else {
     		opID = 0;
     	}
+    	//gets trimmed list of moves
+    	ArrayList<PentagoMove> movesLeft = getTrimmedMoveList(boardState, myPiece, boardState.getAllLegalMoves());
+//    	System.out.println("Level 1 trim: " + movesLeft.size());
+    	double[] bestBranch = new double[movesLeft.size()];
+    	for(int j = 0; j < bestBranch.length; j++) {
+    		bestBranch[j] = 0;
+    	}
     	int i = 0;
-    	ArrayList<PentagoMove> myMove = boardState.getAllLegalMoves();
-    	Integer[] bestBranch = new Integer[myMove.size()];
-
-        for(PentagoMove m : myMove) {
+        for(PentagoMove m : movesLeft) {
         	PentagoBoardState myNewBoard = (PentagoBoardState) boardState.clone();
-            myNewBoard.processMove((PentagoMove) m);
+            myNewBoard.processMove((PentagoMove) m);           
             if(myNewBoard.getWinner() == myID) {//case i can win next move
             	bestBranch[i] +=1000;
-//            	return 100;
             }
-            int j = 0;
-        	ArrayList<PentagoMove> movesOpponent = myNewBoard.getAllLegalMoves();
-        	Integer[] bestBranch2 = new Integer[movesOpponent.size()];
+            
+        	ArrayList<PentagoMove> movesLeft2 = getTrimmedMoveList(myNewBoard, myPiece, myNewBoard.getAllLegalMoves());
+//        	System.out.println("Level 2 trim: " + movesLeft2.size());
 
-            for(PentagoMove mOp : movesOpponent) {
-            	PentagoBoardState opNewBoard = (PentagoBoardState) myNewBoard.clone();
-            	opNewBoard.processMove((PentagoMove) mOp);
-
-                if(opNewBoard.getWinner() == opID) {//case opponent wins next move
-                	bestBranch2[j] -=100;
-//                	return -100;
+           	double[] bestBranch2 = new double[movesLeft2.size()];
+        	for(int j = 0; j < bestBranch2.length; j++) {
+        		bestBranch2[j] = 0;
+        	}
+        	int k = 0;
+            for(PentagoMove m2 : movesLeft2) {
+            	PentagoBoardState myNewBoard2 = (PentagoBoardState) myNewBoard.clone();
+//            	if(!myNewBoard2.isLegal(m2)) {
+//            		continue;
+//            	}
+                myNewBoard2.processMove((PentagoMove) m2);           
+                if(myNewBoard2.getWinner() == opID) {//case i can win next move
+                	bestBranch2[k] -=1000;
                 }
-                int k = 0;
-            	ArrayList<PentagoMove> myMoves2 = myNewBoard.getAllLegalMoves();
-            	Integer[] bestBranch3 = new Integer[myMoves2.size()];
-
-                for(PentagoMove m2 : myMoves2) {
-                	PentagoBoardState myNewBoard2 = (PentagoBoardState) opNewBoard.clone();
-                    myNewBoard.processMove((PentagoMove) m2);
-                    if(myNewBoard.getWinner() == myID) {//case i can win next move
-                    	bestBranch3[k] +=50;
-//                    	return 50;
-                    }
-                    
-                    for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do 10 rollouts
-                    	bestBranch3[k] += rollOutProtocol(myNewBoard2, myID, opID);
-                    }
-                    bestBranch3[k] = bestBranch3[k/NUM_ROLLS];//value of branch is average of number of wins + losses + ties 
-                    k++;
-
-                }
-                bestBranch2[j] = Collections.max(Arrays.asList(bestBranch3));
-                bestBranch2[j] = bestBranch2[j/myMoves2.size()];
-                j++;
-
+        	
+	            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
+	            	bestBranch2[k] += rollOutProtocol(myNewBoard, myID, opID);
+	
+	            }
+	        	bestBranch2[k] = Math.floor((bestBranch2[k]/NUM_ROLLS) * 100) / 100;
+	        	k++;
             }
-            bestBranch[i] = Collections.max(Arrays.asList(bestBranch2));
-            bestBranch[i] = bestBranch2[i/movesOpponent.size()];
+//            System.out.print("bestbranch2: " + k);
+//            printValArray(bestBranch2);
+
+            double sum = 0;
+            for(int l = 0; l < bestBranch2.length; l++) {
+            	sum += bestBranch2[l];
+            }
+            bestBranch[i] += Math.floor(sum * 100) / 100;
+            bestBranch[i] = Math.floor((bestBranch[i]/(bestBranch2.length)) * 1000) / 1000;
             i++;
         }
-//        int bestMove = Collections.max(Arrays.asList(bestBranch));
-        int indexOfBest = getIndexOfMax(bestBranch);
-        return myMove.get(indexOfBest);
 
+        int index = getIndexOfMax(bestBranch);
+        printValArray(bestBranch);
+        System.out.println("Index: "+ index + " Chosen move: " + (movesLeft.get(index)).toPrettyString() );
+		return movesLeft.get(index);
     }
-    private static int getIndexOfMax(Integer[] arr) {
-    	int curMax = arr[0];
+    private static int getIndexOfMax(double[] bestBranch) {
+    	double curMax = bestBranch[0];
     	int curIndex = 0;
-    	for(int i = 0; i < arr.length; i++) {
-    		if(arr[i] > curMax) {
-    			curMax = arr[i];
+    	for(int i = 0; i < bestBranch.length; i++) {
+    		if(bestBranch[i] > curMax) {
+    			curMax = bestBranch[i];
     			curIndex = i;
     		}
     	}
@@ -394,116 +386,25 @@ public class MyTools {
     		return 0;
     	}
     }
-    /*
-    private static ArrayList<PentagoMove> winOrBlockWin(PentagoBoardState boardState, int id) {
-    	int myID = id;
-    	int opID;
-    	if(myID == 0) {
-    		opID = 1;
+	private static void printWorthArray(double[][] moveWorth) {
+		for(int y = 0; y < BOARD_SIZE; y++) {
+    		for(int x = 0; x < BOARD_SIZE; x++) {
+    			System.out.print("["+moveWorth[x][y]+"]\t");
+    		}
+			System.out.println("");
     	}
-    	else {
-    		opID = 0;
-    	}
-    	
-    	ArrayList<PentagoMove> moves = boardState.getAllLegalMoves();
-    	ArrayList<PentagoMove> movePool = new ArrayList<>();
-    	
-    	//my available moves
-//    	System.out.println("\nMY MOVES\n");
-//    	printMoves(moves);
-    	
-        for(PentagoMove m : moves) {
-        	int i = 0;
+	}   
 
-        	PentagoBoardState myNewBoard = (PentagoBoardState) boardState.clone();
-
-            myNewBoard.processMove((PentagoMove) m);
-            if(myNewBoard.getWinner() == myID) {//case i can win next move
-            	movePool.add(m);
-            	return movePool;
-            }
-
-            if(myNewBoard.getWinner() != myID) {//case i dont win next move
-            	//can opponent win next move??
-            	ArrayList<PentagoMove> movesOpponent = myNewBoard.getAllLegalMoves();
-            	
-            	//his available moves
-
-                for(PentagoMove mOp : movesOpponent) {
-                	PentagoBoardState myNewBoard2 = (PentagoBoardState) myNewBoard.clone();//used to be boardState.clone()
-                	
-                	if(myNewBoard2.isLegal(mOp)) {
-	                    myNewBoard2.processMove((PentagoMove) mOp);
-	                    if(myNewBoard2.getWinner() == opID) {//case opponent wins next move
-	                    	//if opponent can win, remove
-	                    	moves.remove(i);
-	                		break;
-	                    }
-                	}
-                }
-            }
-            i++;
-        }
-
-    	return moves;
-    }*/
-    
     private static void printMoves(ArrayList<PentagoMove> moves) {
         for(PentagoMove m : moves) {
         	System.out.println(m.toPrettyString());
         }
 
     }
-    private static void printValArray(Integer[] arr) {
+    private static void printValArray(double[] arr) {
         for(int i = 0; i < arr.length; i++) {
         	System.out.println("Move " + i + ": "+ arr[i]);
         }
 
     }
-    /*
-	private static void makeBoardFromWorthArray(double[][] worthArray, PentagoBoardState boardState){
-		for(int x = 0; x < BOARD_SIZE; x++) {
-			for(int y = 0; y < BOARD_SIZE; y++) {
-				if(worthArray[y][x] == 0) {
-					myBoard[y][x] = boardState.getPieceAt(y, x);
-				}
-			}
-		}
-	}
-    private static void updateBoard(PentagoBoardState pbs) {
-    	//fuck these private methods
-        myBoard = new Piece[BOARD_SIZE][BOARD_SIZE];
-        for (int i = 0; i < BOARD_SIZE; i++) {
-            System.arraycopy(pbs.board[i], 0, myBoard[i], 0, BOARD_SIZE);
-        }
-        myQuadrants = new Piece[NUM_QUADS][QUAD_SIZE][QUAD_SIZE];
-        for (int i = 0; i < NUM_QUADS; i++) {
-            for (int j = 0; j < QUAD_SIZE; j++) {
-                System.arraycopy(pbs.quadrants[i][j], 0, myQuadrants[i][j], 0, QUAD_SIZE);
-            }
-        }
-    }
-
-	private static void swap(Quadrant Q1, Quadrant Q2) {
-	    //Swapping mechanism
-	    int a = quadToInt.get(Q1);
-	    int b = quadToInt.get(Q2);
-	    Piece[][] tmp = myQuadrants[a];
-	    myQuadrants[a] = myQuadrants[b];
-	    myQuadrants[b] = tmp;
-	
-	    buildBoardFromQuadrants();
-	}
-
-
-	private static void buildBoardFromQuadrants() {
-	    for (int i = 0; i < BOARD_SIZE; i++) {
-	        int quadrantRow = i < 3 ? i : i - 3;
-	        int leftQuad = i < 3 ? 0 : 2;
-	        int rightQuad = i < 3 ? 1 : 3;
-	        System.arraycopy(myQuadrants[leftQuad][quadrantRow], 0, myBoard[i], 0, 3);
-	        System.arraycopy(myQuadrants[rightQuad][quadrantRow], 0, myBoard[i], 3, 3);
-	    }
-	}
-	*/
 }
