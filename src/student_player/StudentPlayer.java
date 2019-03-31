@@ -30,27 +30,15 @@ public class StudentPlayer extends PentagoPlayer {
         // You probably will make separate functions in MyTools.
         // For example, maybe you'll need to load some pre-processed best opening
         // strategies...
-//    	System.out.println("TURN : " + boardState.getTurnNumber());
     	
     	
-        if(boardState.firstPlayer() != boardState.getOpponent()) {
-        	//we going first, offense opener
-        	PentagoMove TGMove = MyTools.goFirst(boardState,player_id);
-//        	System.out.println("TURN: "+ boardState.getTurnNumber()+ " PLAY\nMove:" + TGMove.toPrettyString());
+    	MyTools tools = new MyTools(player_id);
+    	
+    	PentagoMove TGMove = tools.goFirst(boardState);
 
-        	return TGMove;
-        }
-        else {
-        	//defense opener
-        	PentagoMove TGMove = MyTools.goSecond(boardState,player_id);
-        	return TGMove;
-        }
-       
-
-
-        // Return your move to be processed by the server.
-
-//        	return TGMove;
+    	return TGMove;
+        
+ 
 
         
     }
