@@ -34,12 +34,11 @@ public class MyTools {
     		opID = 0;
     		myPiece = Piece.BLACK;
     	}
-
     }
 
 
     public PentagoMove goFirst(PentagoBoardState boardState) {
-    	NUM_ROLLS = (int)(35 + Math.pow(((boardState.getTurnNumber()-4)/2),3));
+    	NUM_ROLLS = (int)(25 + Math.pow(((boardState.getTurnNumber()-4)/2),3));
 
         if(boardState.getTurnNumber() == 0) {
         	return hardMoves(boardState);
@@ -48,13 +47,17 @@ public class MyTools {
         	return hardMoves(boardState);
         }
 
-        else if(boardState.getTurnNumber() < 9) {
-            return MonteCarloLite(boardState);
-        }
-        else {     
-            return MonteCarlo(boardState);
-        }
-//      return MonteCarloLite(boardState, id, myPiece);
+//        else if(boardState.getTurnNumber() < 9) {
+//        	NUM_ROLLS = (int)(35 + Math.pow(((boardState.getTurnNumber()-4)/2),3));
+//
+//            return MonteCarloLite(boardState);
+//        }
+//        else {     
+//        	NUM_ROLLS = (int)(5 + Math.pow(((boardState.getTurnNumber()-4)/2),3));
+//
+//            return MonteCarlo(boardState);
+//        }
+      return MonteCarloTrim(boardState);
 
     }
 
@@ -433,6 +436,84 @@ public class MyTools {
     		return 0;
     	}
     }
+    private static PentagoMove MonteCarloTrim(PentagoBoardState boardState) {
+    	//gets trimmed list of moves
+    	ArrayList<PentagoMove> allMoves = boardState.getAllLegalMoves();
+//    	System.out.println("Level 1 trim: " + movesLeft.size());
+    	double[] bestBranch = new double[allMoves.size()];
+    	for(int j = 0; j < bestBranch.length; j++) {
+    		bestBranch[j] = 0;
+    	}
+    	int i = 0;
+        for(PentagoMove m : allMoves) {
+        	PentagoBoardState myNewBoard = (PentagoBoardState) boardState.clone();
+            myNewBoard.processMove((PentagoMove) m);           
+            if(myNewBoard.getWinner() == myID) {//case i can win next move
+            	bestBranch[i] +=1000;
+            	break;
+            }
+        	ArrayList<PentagoMove> allMoves2 = myNewBoard.getAllLegalMoves();
+//        	System.out.println("Level 2 trim: " + movesLeft2.size());
+
+           	double[] bestBranch2 = new double[allMoves2.size()];
+        	for(int j = 0; j < bestBranch2.length; j++) {
+        		bestBranch2[j] = 0;
+        	}
+        	int k = 0;
+        	Random rand = new Random();
+
+            for(PentagoMove m2 : allMoves2) {
+            	if(rand.nextInt(100)%5 == 0)
+            		break;
+            	PentagoBoardState myNewBoard2 = (PentagoBoardState) myNewBoard.clone();
+            	if(!myNewBoard2.isLegal(m2)) {
+            		continue;
+            	}
+
+                myNewBoard2.processMove((PentagoMove) m2);           
+                if(myNewBoard2.getWinner() == opID) {//case i can win next move
+                	bestBranch2[k] -=1000;
+                	break;
+                }
+                
+	            for(int numRolls = 0; numRolls < NUM_ROLLS; numRolls++) {//do rollouts
+	            	bestBranch2[k] += rollOutProtocol(myNewBoard);
+	
+	            }
+	        	bestBranch2[k] = Math.floor((bestBranch2[k]/NUM_ROLLS) * 100) / 100;
+                
+//                System.out.println("move val: " + bestBranch2[k]);
+	        	k++;
+            }
+//            System.out.println("bestbranch2: " + i);
+//            printValArray(bestBranch2);
+
+//            double sum = 0;
+//            for(int l = 0; l < bestBranch2.length; l++) {
+//            	sum += bestBranch2[l];
+//            }
+            bestBranch[i] = getMin(bestBranch2);
+//            bestBranch[i] += Math.floor(sum * 100) / 100;
+
+//            bestBranch[i] = Math.floor((bestBranch[i]/(bestBranch2.length)) * 1000) / 1000;
+            i++;
+        }
+
+        int index = getIndexOfMax(bestBranch);
+//        printValArray(bestBranch);
+//        System.out.println("Index: "+ index + " Chosen move: " + (allMoves.get(index)).toPrettyString() );
+		return allMoves.get(index);
+    }
+    private static double getMin(double[] bestBranch) {
+    	double curMin = bestBranch[0];
+    	for(int i = 0; i < bestBranch.length; i++) {
+    		if(bestBranch[i] < curMin) {
+    			curMin = bestBranch[i];
+    		}
+    	}
+    	return curMin;
+    }
+
     /*
 	private static void printWorthArray(double[][] moveWorth) {
 		for(int y = 0; y < BOARD_SIZE; y++) {

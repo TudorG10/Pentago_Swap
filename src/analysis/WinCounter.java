@@ -11,25 +11,31 @@ public class WinCounter {
 		int AIwins0 = 0;
 		int TGwins1 = 0;
 		int AIwins1 = 0;
+		int draws = 0;
 		br = new BufferedReader(new FileReader(file));
 		try {
 			while((line = br.readLine()) != null) {
 				String[] winner = line.split(",");
-
-				if(Integer.parseInt(winner[0]) % 2 == 0) {//AI first
-					if(Integer.parseInt(winner[3]) == 0){//AI won
-						AIwins0++;
-					}
-					else {//TG won
-						TGwins1++;
-					}
+				if(winner[3].equals("GAMEOVER DRAW")){//TIE
+					draws++;
+					continue;
 				}
-				else {//TG first
-					if(Integer.parseInt(winner[3]) == 0){//TG won
-						TGwins0++;
+				else {
+					if(Integer.parseInt(winner[0]) % 2 == 0) {//AI first
+						if(Integer.parseInt(winner[3]) == 0){//AI won
+							AIwins0++;
+						}
+						else {//TG won
+							TGwins1++;
+						}
 					}
-					else {
-						AIwins1++;
+					else {//TG first
+						if(Integer.parseInt(winner[3]) == 0){//TG won
+							TGwins0++;
+						}
+						else {
+							AIwins1++;
+						}
 					}
 				}
 			}
@@ -44,6 +50,9 @@ public class WinCounter {
 		System.out.println("-------AI WINS-------");
 		System.out.println("First: "+ AIwins0);
 		System.out.println("Second: "+ AIwins1);
+		System.out.println("--------DRAWS--------");
+		System.out.println("Draws: "+ draws);
+
 		
 		
 

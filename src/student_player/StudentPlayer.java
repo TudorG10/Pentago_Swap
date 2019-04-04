@@ -33,7 +33,8 @@ public class StudentPlayer extends PentagoPlayer {
     	
     	
     	MyTools tools = new MyTools(player_id);
-    	
+//    	ToolsLight tools = new ToolsLight(player_id);
+
     	PentagoMove TGMove = tools.goFirst(boardState);
 
     	return TGMove;
